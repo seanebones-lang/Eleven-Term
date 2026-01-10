@@ -1,10 +1,10 @@
-# Grok Terminal Agent
+# NextEleven Terminal Agent
 
 > **AI-powered terminal assistant for macOS** that brings intelligent command generation, error explanation, and safe execution directly into your Terminal.app. Powered by xAI's Grok API, this tool provides Claude-like terminal integration with prefix-triggered AI assistance.
 
 ## What is This?
 
-Grok Terminal Agent is a production-ready CLI tool that seamlessly integrates xAI's Grok AI into your macOS terminal (zsh shell). Instead of switching between your terminal and a browser or separate AI tool, you can now get AI assistance directly in your command line.
+NextEleven Terminal Agent is a production-ready CLI tool that seamlessly integrates xAI's Grok AI into your macOS terminal (zsh shell). Instead of switching between your terminal and a browser or separate AI tool, you can now get AI assistance directly in your command line.
 
 **Think of it as:** Having an AI pair programmer in your terminal that helps you:
 - Generate shell commands from natural language
