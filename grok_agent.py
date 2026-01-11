@@ -458,7 +458,12 @@ Current dir: {cwd}
 Git status: {git_status}
 Dir structure: {dir_tree}{project_info}
 All tools available (Jan 10, 2026): {tools_list}
-Use tool calling format: <tool name="ToolName"><param name="param1">value</param></tool>
+
+CRITICAL: When providing code or creating files, you MUST use tools:
+- Use XML format: <tool name="Write"><param name="path">filename.py</param><param name="contents">code here</param></tool>
+- Or describe clearly: "Tool: Write file=filename.py" or "Use Write tool to create filename.py"
+- The system will automatically create files from code blocks, but explicit tool usage is preferred
+
 Be concise for CLI. Maintain todos if mentioned. Use appropriate tools based on project type."""
 
 # Lightweight topic prompt (emulates Claude's check-new-topic)

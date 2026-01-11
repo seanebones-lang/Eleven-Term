@@ -369,6 +369,26 @@ def run_interactive_loop(
                 params = {p[0]: p[1] for p in params_list}
                 execute_tool_safely(tool_name, params, args, history)
             
+            # Also check for code blocks and auto-create files
+            try:
+                from code_block_parser import extract_code_blocks, create_files_from_code_blocks
+                import os
+                
+                code_blocks = extract_code_blocks(full_response)
+                if code_blocks:
+                    print(colored(f"\n📝 Detected {len(code_blocks)} code block(s), creating files...", 'cyan'))
+                    cwd = os.getcwd()
+                    results = create_files_from_code_blocks(code_blocks, cwd)
+                    for filename, success, message in results:
+                        if success:
+                            print(colored(f"   ✓ {message}", 'green'))
+                        else:
+                            print(colored(f"   ✗ {message}", 'red'))
+            except ImportError:
+                pass  # code_block_parser not available
+            except Exception as e:
+                pass  # Silent fail for code block parsing
+            
             # Compact history if too long
             history = compact_history_if_needed(history, api_key, config)
             
