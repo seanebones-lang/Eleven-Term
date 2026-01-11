@@ -15,6 +15,118 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def extract_tools_from_natural_language(response: str) -> List[Tuple[str, List[Tuple[str, str]]]]:
+    """Extract tool calls from natural language responses (fallback for orchestrator API)
+    
+    Parses patterns like:
+    - "Tool: ls" or "Tool: LS"
+    - "Use LS tool" or "Use the View tool"
+    - "Tool Request: Bash" or "Execute: ls -la"
+    - "I need to use the View tool to read file.txt"
+    """
+    tools = []
+    
+    # Normalize response for easier parsing
+    response_lower = response.lower()
+    
+    # Pattern 1: "Tool: <name>", "Tool Request: <name>", "🔧 Tool Request", etc.
+    tool_pattern1 = r'(?:tool\s*(?:request)?:?\s*|use\s+(?:the\s+)?|execute\s+)(ls|view|edit|write|bash|grep|glob)(?:\s+tool)?'
+    matches1 = list(re.finditer(tool_pattern1, response_lower, re.IGNORECASE))
+    
+    # Also catch emoji patterns like "🔧 Tool Request"
+    emoji_pattern = r'[🔧⚙️🛠️]\s*(?:tool\s*(?:request)?:?\s*)?(ls|view|edit|write|bash|grep|glob)'
+    emoji_matches = list(re.finditer(emoji_pattern, response_lower, re.IGNORECASE))
+    matches1 = matches1 + emoji_matches
+    
+    for match in matches1:
+        tool_name = match.group(1).upper()
+        if tool_name == "LS":
+            tools.append(("LS", [("path", ".")]))
+        elif tool_name in ["VIEW", "EDIT", "WRITE"]:
+            # Try to find file path nearby
+            context_start = max(0, match.start() - 50)
+            context_end = min(len(response), match.end() + 100)
+            context = response[context_start:context_end]
+            
+            # Look for file paths
+            file_pattern = r'(?:file|path|read|write|edit)\s+(?:to\s+|from\s+)?([a-zA-Z0-9_./-]+\.(?:py|js|ts|jsx|tsx|json|md|txt|yml|yaml|toml|rs|go|java|kt|swift|cpp|c|h|hpp|rb|php|sh|bash|zsh|fish)|[a-zA-Z0-9_./-]+/[a-zA-Z0-9_./-]+)'
+            file_match = re.search(file_pattern, context, re.IGNORECASE)
+            if file_match:
+                file_path = file_match.group(1).strip()
+                if tool_name == "VIEW":
+                    tools.append(("View", [("path", file_path)]))
+                elif tool_name == "EDIT":
+                    tools.append(("Edit", [("path", file_path)]))
+                elif tool_name == "WRITE":
+                    # For write, we'd need content - skip for now
+                    pass
+        elif tool_name == "BASH":
+            # Try to find command
+            context_start = max(0, match.start() - 50)
+            context_end = min(len(response), match.end() + 150)
+            context = response[context_start:context_end]
+            
+            # Look for command patterns
+            cmd_patterns = [
+                r'(?:command|execute|run):\s*([^\n]+)',
+                r'`([^`]+)`',
+                r'"([^"]+)"',
+                r'(?:run|execute)\s+([a-zA-Z0-9_./-]+\s+[^\n]+)'
+            ]
+            for pattern in cmd_patterns:
+                cmd_match = re.search(pattern, context, re.IGNORECASE)
+                if cmd_match:
+                    cmd = cmd_match.group(1).strip()
+                    if len(cmd) < 200:  # Sanity check
+                        tools.append(("Bash", [("command", cmd)]))
+                        break
+    
+    # Pattern 2: Explicit XML-like mentions that aren't properly formatted
+    xml_like = r'<tool\s+name=["\']?(\w+)["\']?>'
+    xml_matches = re.finditer(xml_like, response, re.IGNORECASE)
+    for match in xml_matches:
+        tool_name = match.group(1).upper()
+        # Try to extract params from surrounding context
+        context_start = match.start()
+        context_end = min(len(response), match.end() + 200)
+        context = response[context_start:context_end]
+        
+        if tool_name == "LS":
+            path_match = re.search(r'(?:path|dir|directory)[=:]\s*["\']?([^"\'\s]+)', context, re.IGNORECASE)
+            path = path_match.group(1) if path_match else "."
+            tools.append(("LS", [("path", path)]))
+        elif tool_name == "VIEW":
+            path_match = re.search(r'(?:path|file)[=:]\s*["\']?([^"\'\s]+)', context, re.IGNORECASE)
+            if path_match:
+                tools.append(("View", [("path", path_match.group(1))]))
+        elif tool_name == "BASH":
+            cmd_match = re.search(r'(?:command|cmd)[=:]\s*["\']?([^"\']+)', context, re.IGNORECASE)
+            if cmd_match:
+                tools.append(("Bash", [("command", cmd_match.group(1).strip())]))
+    
+    # Pattern 3: Direct action statements
+    # "List files in current directory" -> LS
+    if re.search(r'list\s+(?:all\s+)?(?:files|directory|dir)', response_lower):
+        if not any(t[0] == "LS" for t in tools):
+            tools.append(("LS", [("path", ".")]))
+    
+    # "Read file X" or "View file X" -> View
+    read_match = re.search(r'(?:read|view|open)\s+(?:the\s+)?(?:file\s+)?([a-zA-Z0-9_./-]+\.(?:py|js|ts|jsx|tsx|json|md|txt|yml|yaml|toml|rs|go|java|kt|swift|cpp|c|h|hpp|rb|php|sh|bash|zsh|fish)|[a-zA-Z0-9_./-]+/[a-zA-Z0-9_./-]+)', response_lower)
+    if read_match and not any(t[0] == "View" for t in tools):
+        tools.append(("View", [("path", read_match.group(1))]))
+    
+    # Deduplicate tools (keep first occurrence)
+    seen = set()
+    unique_tools = []
+    for tool_name, params in tools:
+        key = (tool_name, tuple(sorted(params)))
+        if key not in seen:
+            seen.add(key)
+            unique_tools.append((tool_name, params))
+    
+    return unique_tools
+
 # Loop state file location
 LOOP_STATE_DIR = os.path.expanduser('~/.grok_terminal/loops')
 LOOP_LOG_DIR = os.path.expanduser('~/.grok_terminal/loop_logs')
@@ -139,10 +251,15 @@ class LoopState:
         base_prompt = self.prompt
         context = self.get_context_string()
         
+        # Add tool usage instructions for first iteration
+        tool_instructions = ""
+        if self.current_iteration == 0:
+            tool_instructions = "\n\nCRITICAL: You MUST use tools in XML format to interact with files:\n\n<tool name=\"LS\"><param name=\"path\">.</param></tool>\n<tool name=\"View\"><param name=\"path\">filename.py</param></tool>\n<tool name=\"Bash\"><param name=\"command\">ls -la</param></tool>\n\nIf you cannot use XML format, describe tools clearly like:\n- \"Tool: LS\" or \"Use LS tool to list files\"\n- \"Tool: View file=main.py\" or \"Read the file main.py\"\n- \"Tool: Bash command='python test.py'\" or \"Run: python test.py\"\n\nStart by listing files, then read and refactor them."
+        
         if context:
-            return f"{base_prompt}\n\nPrevious iterations:\n{context}\n\nContinue working on this task. Output '{self.completion_promise}' when complete."
+            return f"{base_prompt}{tool_instructions}\n\nPrevious iterations:\n{context}\n\nContinue working on this task. Output '{self.completion_promise}' when complete."
         else:
-            return f"{base_prompt}\n\nOutput '{self.completion_promise}' when complete."
+            return f"{base_prompt}{tool_instructions}\n\nOutput '{self.completion_promise}' when complete."
     
     def cleanup(self) -> None:
         """Clean up loop state files (optional, for completed loops)"""
@@ -234,6 +351,10 @@ def run_eleven_loop(
     loop = LoopState(loop_id, prompt, completion_promise, max_iterations)
     loop.save()
     
+    # Keep using orchestrator - it works, we'll parse natural language tool requests
+    # The natural language parser handles conversational tool descriptions
+    loop_config = config.copy()
+    
     executed_outputs = []
     
     try:
@@ -260,7 +381,7 @@ def run_eleven_loop(
             
             full_response = ""
             try:
-                for chunk in call_grok_api(api_key, messages, config['model'], config['temperature'], config['max_tokens'], stream=True, config=config):
+                for chunk in call_grok_api(api_key, messages, config['model'], config['temperature'], config['max_tokens'], stream=True, config=loop_config):
                     content = chunk.get('choices', [{}])[0].get('delta', {}).get('content', '')
                     if content:
                         print(content, end='', flush=True)
@@ -281,13 +402,24 @@ def run_eleven_loop(
             # Extract and execute tools
             executed_output = ""
             tool_calls = extract_tools(full_response)
+            
+            # Fallback: if no XML tools found, try natural language parsing
+            if not tool_calls:
+                tool_calls = extract_tools_from_natural_language(full_response)
+                if tool_calls:
+                    logger.debug(f"Extracted {len(tool_calls)} tools from natural language response")
+            
             for tool_name, params_list in tool_calls:
                 params = {p[0]: p[1] for p in params_list}
                 if execute_tool_safely and args:
-                    exit_code, stdout, stderr = execute_tool_safely(tool_name, params, args, history)
-                    if exit_code is not None and (stdout or stderr):
-                        executed_output += f"\n[{tool_name}] {stdout if stdout else stderr}"
-                        executed_outputs.append(executed_output)
+                    try:
+                        exit_code, stdout, stderr = execute_tool_safely(tool_name, params, args, history)
+                        if exit_code is not None and (stdout or stderr):
+                            executed_output += f"\n[{tool_name}] Exit code: {exit_code}\n{stdout if stdout else stderr}"
+                            executed_outputs.append(executed_output)
+                    except Exception as e:
+                        logger.error(f"Error executing tool {tool_name}: {e}")
+                        executed_output += f"\n[{tool_name}] Error: {str(e)}"
             
             # Add iteration
             loop.add_iteration(full_response, executed_output)
