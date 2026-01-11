@@ -36,8 +36,8 @@ def handle_list_agents(config: Dict[str, Any]) -> None:
     print("")
     sys.exit(0)
 
-def handle_slash_commands(user_input: str, api_key: str, config: Dict[str, Any], history: List[Dict[str, str]]) -> bool:
-    """Handle slash commands (/help, /init, /clear, /hooks)
+def handle_slash_commands(user_input: str, api_key: str, config: Dict[str, Any], history: List[Dict[str, str]], args: Any = None) -> bool:
+    """Handle slash commands (/help, /init, /clear, /hooks, /eleven-loop, /cancel-loop)
     
     Returns:
         True if command was handled, False otherwise
@@ -50,6 +50,8 @@ def handle_slash_commands(user_input: str, api_key: str, config: Dict[str, Any],
         print("  /init  - Generate ELEVEN.md with project instructions/tools")
         print("  /clear - Reset conversation history")
         print("  /hooks - Configure hooks (see ~/.grok_terminal/hooks/ for details)")
+        print("  /eleven-loop <prompt> --completion-promise \"<phrase>\" [--max-iterations N] - Start iterative loop")
+        print("  /cancel-loop - Cancel active loop")
         return True
     elif user_input == '/init':
         try:
@@ -80,6 +82,65 @@ def handle_slash_commands(user_input: str, api_key: str, config: Dict[str, Any],
         hook_dir = os.path.expanduser(DEFAULT_CONFIG['hooks_dir'])
         print(colored(f"Hooks directory: {hook_dir}", 'cyan'))
         print("Create PreToolUse.sh and PostToolUse.sh in this directory")
+        return True
+    elif user_input.startswith('/eleven-loop'):
+        # Parse loop command
+        try:
+            from loop_utils import run_eleven_loop, generate_loop_id
+            import shlex
+            
+            parts = shlex.split(user_input)
+            if len(parts) < 2:
+                print(colored("Usage: /eleven-loop <prompt> --completion-promise \"<phrase>\" [--max-iterations N]", 'yellow'))
+                return True
+            
+            # Parse arguments
+            prompt = ""
+            completion_promise = "DONE"
+            max_iterations = 20
+            i = 1
+            while i < len(parts):
+                if parts[i] == '--completion-promise' and i + 1 < len(parts):
+                    completion_promise = parts[i + 1]
+                    i += 2
+                elif parts[i] == '--max-iterations' and i + 1 < len(parts):
+                    max_iterations = int(parts[i + 1])
+                    i += 2
+                else:
+                    if prompt:
+                        prompt += " "
+                    prompt += parts[i]
+                    i += 1
+            
+            if not prompt:
+                print(colored("Error: Prompt required", 'red'))
+                return True
+            
+            print(colored(f"Starting loop: {prompt[:50]}...", 'cyan'))
+            print(colored(f"Completion promise: '{completion_promise}' | Max iterations: {max_iterations}", 'cyan'))
+            
+            loop_id = generate_loop_id()
+            result = run_eleven_loop(
+                loop_id, prompt, completion_promise, max_iterations,
+                api_key, config, history, args  # Pass args from caller
+            )
+            print(colored(f"\nLoop result: {result}", 'green'))
+        except ImportError:
+            print(colored("Error: loop_utils module not available", 'red'))
+        except Exception as e:
+            print(colored(f"Error starting loop: {e}", 'red'))
+        return True
+    elif user_input == '/cancel-loop':
+        try:
+            from loop_utils import cancel_active_loop
+            if cancel_active_loop():
+                print(colored("Active loop cancelled.", 'green'))
+            else:
+                print(colored("No active loop found.", 'yellow'))
+        except ImportError:
+            print(colored("Error: loop_utils module not available", 'red'))
+        except Exception as e:
+            print(colored(f"Error cancelling loop: {e}", 'red'))
         return True
     
     return False
@@ -238,7 +299,7 @@ def run_interactive_loop(
                 break
             
             # Handle slash commands
-            if handle_slash_commands(user_input, api_key, config, history):
+            if handle_slash_commands(user_input, api_key, config, history, args):
                 continue
             
             # Topic detection

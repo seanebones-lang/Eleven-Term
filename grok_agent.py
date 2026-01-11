@@ -2468,7 +2468,7 @@ def main():
 
                 # Slash commands (Claude-like) - use helper if available
                 if user_input.startswith('/'):
-                    if MAIN_HELPERS_AVAILABLE and handle_slash_commands(user_input, api_key, config, history):
+                    if MAIN_HELPERS_AVAILABLE and handle_slash_commands(user_input, api_key, config, history, args):
                         continue
                     # Fallback to inline implementation
                     if user_input == '/help':
