@@ -1,9 +1,10 @@
 #!/usr/bin/env zsh
-# Grok Terminal Agent - Zsh Plugin
-# Provides prefix-triggered AI assistance in terminal
+# NextEleven Terminal Agent - Zsh Plugin
+# eleven-powered, reverse-engineered from Claude Code
+# Provides prefix-triggered AI assistance and interactive mode
 
 # Configuration
-GROK_AGENT_DIR="$HOME/.grok-terminal"
+GROK_AGENT_DIR="$HOME/.grok_terminal"
 GROK_AGENT_SCRIPT="$GROK_AGENT_DIR/grok_agent.py"
 GROK_PREFIX="NextEleven AI:"
 
@@ -12,179 +13,64 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 CYAN='\033[0;36m'
+BLUE='\033[0;34m'
 RESET='\033[0m'
 
 # Check if agent script exists
 if [[ ! -f "$GROK_AGENT_SCRIPT" ]]; then
-    echo "${RED}Error: Grok agent not found at $GROK_AGENT_SCRIPT${RESET}"
+    echo "${RED}Error: eleven agent not found at $GROK_AGENT_SCRIPT${RESET}"
     echo "Run install.sh to install the agent."
     return 1
 fi
 
-# Function to handle Grok queries
+# Prefix handler for "NextEleven AI: <query>"
+_grok_prefix_handler() {
+    local query="${1#${GROK_PREFIX}}"
+    query="${query## }"  # Trim leading space
+    
+    # Check for flags
+    local flags=()
+    if [[ "$query" =~ --no-log ]]; then
+        flags+=("--no-log")
+        query="${query//--no-log/}"
+        query="${query//  / }"
+        query="${query## }"
+        query="${query%% }"
+    fi
+    
+    if [[ "$query" =~ --force ]]; then
+        flags+=("--force")
+        query="${query//--force/}"
+        query="${query//  / }"
+        query="${query## }"
+        query="${query%% }"
+    fi
+    
+    # Call Python agent in non-interactive mode
+    python3 "$GROK_AGENT_SCRIPT" "$query" "${flags[@]}"
+    return $?
+}
+
+# Function to handle Grok queries (called from NextEleven function)
 _grok_handler() {
     local cmd="$1"
     
     # Check if command starts with prefix
     if [[ "$cmd" =~ ^"$GROK_PREFIX "(.*) ]]; then
         local query="${match[1]}"
-        
-        # Check for flags
-        local no_log_flag=""
-        local force_flag=""
-        
-        if [[ "$query" =~ --no-log ]]; then
-            no_log_flag="--no-log"
-            query="${query//--no-log/}"
-            query="${query//  / }"  # Clean up double spaces
-            query="${query## }"     # Trim leading space
-            query="${query%% }"     # Trim trailing space
-        fi
-        
-        if [[ "$query" =~ --force ]]; then
-            force_flag="--force"
-            query="${query//--force/}"
-            query="${query//  / }"
-            query="${query## }"
-            query="${query%% }"
-        fi
-        
-        # Call Python agent
-        local output
-        output=$(python3 "$GROK_AGENT_SCRIPT" "$query" $no_log_flag $force_flag 2>&1)
-        local exit_code=$?
-        
-        # Print output (already includes streaming from Python)
-        echo "$output"
-        
-        # Extract commands JSON if present
-        if [[ "$output" =~ COMMANDS_JSON_START(.*)COMMANDS_JSON_END ]]; then
-            local commands_json="${match[1]}"
-            
-            # Parse commands
-            local commands
-            local force_required
-            
-            # Use Python to parse JSON (more reliable than zsh)
-            local parsed=$(python3 -c "
-import json
-import sys
-try:
-    data = json.loads('''$commands_json''')
-    print('COMMANDS:' + '|'.join(data.get('commands', [])))
-    print('FORCE:' + str(data.get('force_required', False)).lower())
-except:
-    pass
-" 2>/dev/null)
-            
-            if [[ -n "$parsed" ]]; then
-                # Extract commands
-                if [[ "$parsed" =~ COMMANDS:(.*) ]]; then
-                    commands="${match[1]}"
-                fi
-                
-                # Extract force_required flag
-                if [[ "$parsed" =~ FORCE:(.*) ]]; then
-                    force_required="${match[1]}"
-                fi
-                
-                if [[ -n "$commands" && "$commands" != "COMMANDS:" ]]; then
-                    # Split commands by pipe
-                    local cmd_array=("${(s:|:)commands}")
-                    
-                    if [[ ${#cmd_array[@]} -gt 1 ]]; then
-                        # Multiple commands - use fzf for selection
-                        echo ""
-                        echo "${CYAN}Select a command to execute:${RESET}"
-                        local selected=$(printf '%s\n' "${cmd_array[@]}" | fzf --height=40% --border --prompt="Command: ")
-                        
-                        if [[ -n "$selected" ]]; then
-                            _grok_execute_command "$selected" "$force_required"
-                        else
-                            echo "${YELLOW}Cancelled${RESET}"
-                        fi
-                    else
-                        # Single command
-                        if [[ -n "$cmd_array[1]" ]]; then
-                            _grok_execute_command "$cmd_array[1]" "$force_required"
-                        fi
-                    fi
-                fi
-            fi
-        fi
-        
-        # Return exit code from Python script
-        return $exit_code
+        _grok_prefix_handler "$GROK_PREFIX $query"
+        return $?
     fi
 }
 
-# Function to safely execute commands
-_grok_execute_command() {
-    local cmd="$1"
-    local force_required="$2"
-    
-    # Check if force is required but not provided
-    # If force_required is true, it means the command is dangerous and user didn't provide --force
-    if [[ "$force_required" == "true" ]]; then
-        echo ""
-        echo "${RED}This command requires the --force flag${RESET}"
-        echo "${YELLOW}Usage: NextEleven AI: <query> --force${RESET}"
-        return 1
-    fi
-    
-    # Show preview
-    echo ""
-    echo "${CYAN}Preview:${RESET} Would run in ${CYAN}$(pwd)${RESET}"
-    echo "${CYAN}Command:${RESET} $cmd"
-    echo ""
-    
-    # Prompt for confirmation
-    echo -n "${GREEN}Execute? [y/n/e(dit)]: ${RESET}"
-    read -r response
-    
-    case "$response" in
-        [Yy]|[Yy][Ee][Ss])
-            echo "${GREEN}Executing...${RESET}"
-            echo ""
-            eval "$cmd"
-            local exit_code=$?
-            echo ""
-            if [[ $exit_code -eq 0 ]]; then
-                echo "${GREEN}✓ Command completed successfully${RESET}"
-            else
-                echo "${RED}✗ Command failed with exit code $exit_code${RESET}"
-            fi
-            ;;
-        [Ee]|[Ee][Dd][Ii][Tt])
-            # Edit command
-            local edited_cmd=$(echo "$cmd" | vim -c 'set ft=sh' '+normal $' -)
-            if [[ -n "$edited_cmd" && "$edited_cmd" != "$cmd" ]]; then
-                echo "${CYAN}Executing edited command...${RESET}"
-                echo ""
-                eval "$edited_cmd"
-            else
-                echo "${YELLOW}Cancelled${RESET}"
-            fi
-            ;;
-        *)
-            echo "${YELLOW}Cancelled${RESET}"
-            ;;
-    esac
-}
-
-# Create NextEleven function to handle the prefix
-# When user types "NextEleven AI: query", zsh will call NextEleven() with "AI:" and "query" as args
+# NextEleven function for prefix-triggered interaction
+# Usage: NextEleven AI: <your query>
 NextEleven() {
-    # Reconstruct the full command from arguments
-    # $@ will be "AI:" "query" "with" "multiple" "words"
-    # We need to join them properly, handling the "AI:" prefix
     if [[ "$1" == "AI:" ]]; then
-        # Skip the "AI:" and join the rest
         shift
         local query="$*"
         local full_cmd="$GROK_PREFIX $query"
     else
-        # If "AI:" is missing, treat all args as the query
         local query="$*"
         local full_cmd="$GROK_PREFIX $query"
     fi
@@ -192,8 +78,135 @@ NextEleven() {
     return $?
 }
 
-# Also handle case where command_not_found_handler is called
-# (fallback for edge cases)
+# Interactive launcher (type 'eleven')
+# Usage: eleven [--dangerously-skip-permissions] [--no-log] [--force] [--model MODEL_NAME] [--config CONFIG_PATH] [--endpoint URL]
+eleven() {
+    local flags=()
+    
+    # Parse flags
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dangerously-skip-permissions)
+                flags+=("--dangerously-skip-permissions")
+                shift
+                ;;
+            --no-log)
+                flags+=("--no-log")
+                shift
+                ;;
+            --force)
+                flags+=("--force")
+                shift
+                ;;
+            --model)
+                flags+=("--model" "$2")
+                shift 2
+                ;;
+            --config)
+                flags+=("--config" "$2")
+                shift 2
+                ;;
+            --endpoint)
+                flags+=("--endpoint" "$2")
+                shift 2
+                ;;
+            *)
+                # Unknown flag or argument
+                break
+                ;;
+        esac
+    done
+    
+    # Call Python agent in interactive mode
+    python3 "$GROK_AGENT_SCRIPT" --interactive "${flags[@]}"
+    return $?
+}
+
+# Safe execution wrapper (called from Python for command execution)
+# This is used when tools need to execute commands with confirmation
+_grok_execute_command() {
+    local cmd="$1"
+    local dir="${2:-$(pwd)}"
+    local risk="${3:-CAUTION}"
+    local force="${4:-}"
+    
+    echo "${CYAN}Preview:${RESET} Would run in ${CYAN}$dir${RESET}"
+    echo "${CYAN}Command:${RESET} $cmd"
+    echo "${CYAN}Risk:${RESET} $risk"
+    
+    if [[ "$risk" == "DANGEROUS" && "$force" != "--force" ]]; then
+        echo "${RED}Requires --force for dangerous commands.${RESET}"
+        return 1
+    fi
+    
+    echo -n "${GREEN}Execute? [y/n/e(dit)]: ${RESET}"
+    read -r choice
+    
+    case "$choice" in
+        [Yy]|[Yy][Ee][Ss])
+            # Use security_utils.py for safe execution if available
+            local security_script="$GROK_AGENT_DIR/security_utils.py"
+            if [[ -f "$security_script" ]]; then
+                cd "$dir" && python3 "$security_script" "$cmd" $force 2>&1
+                local exit_code=$?
+            else
+                # Fallback: use Python subprocess for safer execution (still not ideal but better than eval)
+                cd "$dir" && python3 -c "
+import subprocess
+import shlex
+import sys
+try:
+    args = shlex.split(sys.argv[1])
+    result = subprocess.run(args, shell=False, capture_output=True, text=True, timeout=60)
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+    sys.exit(result.returncode)
+except:
+    # Last resort: shell execution (less safe but functional)
+    result = subprocess.run(sys.argv[1], shell=True, capture_output=True, text=True, timeout=60)
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+    sys.exit(result.returncode)
+" "$cmd" 2>&1
+                local exit_code=$?
+            fi
+            
+            if [[ $exit_code -eq 0 ]]; then
+                echo "${GREEN}✓ Command completed.${RESET}"
+            else
+                echo "${RED}✗ Command failed with exit code $exit_code${RESET}"
+            fi
+            return $exit_code
+            ;;
+        [Ee]|[Ee][Dd][Ii][Tt])
+            # Edit command
+            local tmpfile=$(mktemp /tmp/grok_cmd_XXXXXX)
+            echo "$cmd" > "$tmpfile"
+            vim "$tmpfile"
+            local edited_cmd=$(cat "$tmpfile")
+            rm "$tmpfile"
+            
+            if [[ -n "$edited_cmd" && "$edited_cmd" != "$cmd" ]]; then
+                echo "${CYAN}Executing edited command...${RESET}"
+                # Recursive call with edited command
+                _grok_execute_command "$edited_cmd" "$dir" "$risk" "$force"
+            else
+                echo "${YELLOW}Cancelled${RESET}"
+            fi
+            ;;
+        *)
+            echo "${YELLOW}Cancelled${RESET}"
+            return 1
+            ;;
+    esac
+}
+
+# fzf for multi-command selection (if multiple commands suggested)
+_grok_select_command() {
+    echo "$1" | fzf --multi --height=40% --border --prompt="Select command(s): "
+}
+
+# Command not found handler (fallback)
 command_not_found_handler() {
     local cmd="$1"
     
@@ -207,18 +220,6 @@ command_not_found_handler() {
     # Not our command, show normal error
     echo "zsh: command not found: $cmd" >&2
     return 127
-}
-
-# Export helper function for manual invocation
-grok() {
-    if [[ $# -eq 0 ]]; then
-        echo "${CYAN}Usage: grok <query>${RESET}"
-        echo "${CYAN}Example: grok 'list files in current directory'${RESET}"
-        return 1
-    fi
-    
-    local query="$*"
-    _grok_handler "$GROK_PREFIX $query"
 }
 
 # Success message (only show once per session)

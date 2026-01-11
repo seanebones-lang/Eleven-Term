@@ -1,0 +1,11 @@
+
+# Creator identity information (sensitive - never commit)
+identity_verify.py
+README_CREATOR.md
+*_CREATOR.md
+*creator*.md
+*CREATOR*.md
+
+# Sensitive configuration
+creator_config.json
+.sean_mcdonnell
