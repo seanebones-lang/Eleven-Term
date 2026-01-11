@@ -23,6 +23,65 @@ from functools import lru_cache
 from typing import Optional, List, Dict, Any, Tuple, Iterator
 from collections import OrderedDict
 import asyncio
+import threading
+
+# Try to import disk cache (optional)
+try:
+    from cache_utils import get_disk_cache, DiskCache
+    DISK_CACHE_AVAILABLE = True
+except ImportError:
+    DISK_CACHE_AVAILABLE = False
+    DiskCache = None  # type: ignore
+
+# Try to import plugin system (optional)
+try:
+    from plugin_system import get_tool as plugin_get_tool, execute_tool as plugin_execute_tool, load_plugins_from_directory, list_tools as plugin_list_tools
+    PLUGIN_SYSTEM_AVAILABLE = True
+except ImportError:
+    PLUGIN_SYSTEM_AVAILABLE = False
+    plugin_get_tool = None  # type: ignore
+    plugin_execute_tool = None  # type: ignore
+    load_plugins_from_directory = None  # type: ignore
+
+# Try to import validation utils (optional)
+try:
+    from validation_utils import validate_tool_params, validate_command, validate_file_path
+    VALIDATION_AVAILABLE = True
+except ImportError:
+    VALIDATION_AVAILABLE = False
+
+# Try to import local LLM (optional)
+try:
+    from local_llm import check_ollama_available, call_ollama_api
+    LOCAL_LLM_AVAILABLE = True
+except ImportError:
+    LOCAL_LLM_AVAILABLE = False
+    check_ollama_available = None  # type: ignore
+    call_ollama_api = None  # type: ignore
+
+# Try to import agent chaining (optional)
+try:
+    from agent_chaining import chain_agents, AgentChain
+    AGENT_CHAINING_AVAILABLE = True
+except ImportError:
+    AGENT_CHAINING_AVAILABLE = False
+
+# Try to import multi-modal utils (optional)
+try:
+    from multimodal_utils import create_multimodal_messages, encode_image_to_base64
+    MULTIMODAL_AVAILABLE = True
+except ImportError:
+    MULTIMODAL_AVAILABLE = False
+
+# Try to import main helpers (optional)
+try:
+    from main_helpers import (
+        handle_list_agents, handle_slash_commands, execute_tool_safely,
+        compact_history_if_needed, initialize_interactive_session, run_interactive_loop
+    )
+    MAIN_HELPERS_AVAILABLE = True
+except ImportError:
+    MAIN_HELPERS_AVAILABLE = False
 
 # Configure logging
 _log_dir = os.path.expanduser('~/.grok_terminal')
@@ -337,6 +396,11 @@ _http_async_client: Optional[httpx.AsyncClient] = None
 # Response cache (in-memory, LRU with semantic hash based keys)
 _response_cache: OrderedDict[str, Tuple[float, Any]] = OrderedDict()  # hash -> (timestamp, response)
 _cache_stats: Dict[str, int] = {"hits": 0, "misses": 0, "evictions": 0}  # Cache statistics
+_disk_cache: Optional[DiskCache] = None  # Disk cache instance (optional)
+
+# Request deduplication (track in-flight requests)
+_in_flight_requests: Dict[str, Any] = {}
+_in_flight_lock = threading.Lock()  # Lock for thread-safe access
 
 # Dangerous patterns (expanded from Claude's Bash security)
 DANGEROUS_PATTERNS = [
@@ -1216,6 +1280,15 @@ def tool_sops_decrypt(params: Dict[str, Any]) -> Tuple[int, str, str]:
         return 1, "", str(e)
 
 # Tools registry
+# Initialize plugin system if available
+if PLUGIN_SYSTEM_AVAILABLE and load_plugins_from_directory:
+    try:
+        plugin_dir = os.path.expanduser('~/.grok_terminal/plugins')
+        if os.path.exists(plugin_dir):
+            load_plugins_from_directory(plugin_dir)
+    except Exception as e:
+        logger.debug(f"Could not load plugins: {e}")
+
 TOOLS = {
     "Bash": tool_bash,
     "View": tool_view,
@@ -1629,16 +1702,27 @@ def _semantic_hash(messages: List[Dict[str, str]], model: str, temperature: floa
     return hashlib.md5(cache_key.encode()).hexdigest()
 
 
-def _check_cache(cache_key: str, ttl: float) -> Optional[Any]:
+def _check_cache(cache_key: str, ttl: float, use_disk: bool = False) -> Optional[Any]:
     """Check if response is in cache and still valid (LRU: move to end on access)
     
     Args:
         cache_key: Cache key (semantic hash)
         ttl: Time-to-live in seconds
+        use_disk: Use disk cache if available
         
     Returns:
         Cached response if valid, None otherwise
     """
+    # Try disk cache first if enabled
+    if use_disk and DISK_CACHE_AVAILABLE:
+        global _disk_cache
+        if _disk_cache is None:
+            _disk_cache = get_disk_cache(max_size=100, ttl=ttl)
+        cached = _disk_cache.get(cache_key)
+        if cached is not None:
+            return cached
+    
+    # Fallback to in-memory cache
     if cache_key in _response_cache:
         timestamp, response = _response_cache[cache_key]
         if time.time() - timestamp < ttl:
@@ -1680,14 +1764,24 @@ def reset_cache() -> None:
     _cache_stats = {"hits": 0, "misses": 0, "evictions": 0}
 
 
-def _update_cache(cache_key: str, response: Any, max_size: int) -> None:
+def _update_cache(cache_key: str, response: Any, max_size: int, use_disk: bool = False) -> None:
     """Update cache with response, evict oldest (LRU) if full
     
     Args:
         cache_key: Cache key (semantic hash)
         response: Response to cache
         max_size: Maximum cache size
+        use_disk: Use disk cache if available
     """
+    # Use disk cache if enabled
+    if use_disk and DISK_CACHE_AVAILABLE:
+        global _disk_cache
+        if _disk_cache is None:
+            _disk_cache = get_disk_cache(max_size=max_size, ttl=300.0)
+        _disk_cache.set(cache_key, response)
+        return
+    
+    # Fallback to in-memory cache
     # Remove key if exists (to move to end)
     if cache_key in _response_cache:
         del _response_cache[cache_key]
@@ -1827,9 +1921,28 @@ def call_grok_api(
     # Check cache for non-streaming requests
     if not stream and config.get("cache_enabled", True):
         cache_key = _semantic_hash(messages, model, temperature)
-        cached_response = _check_cache(cache_key, config.get("cache_ttl", 300))
+        
+        # Check for duplicate in-flight requests (request deduplication)
+        with _in_flight_lock:
+            if cache_key in _in_flight_requests:
+                logger.info(f"Deduplicating request: {cache_key[:8]}...")
+                # Wait for in-flight request to complete
+                import time as time_module
+                while cache_key in _in_flight_requests:
+                    time_module.sleep(0.1)
+                # Try cache again (in-flight request should have cached it)
+                cached_response = _check_cache(cache_key, config.get("cache_ttl", 300), config.get("cache_disk", False))
+                if cached_response is not None:
+                    return cached_response
+        
+        # Check cache
+        cached_response = _check_cache(cache_key, config.get("cache_ttl", 300), config.get("cache_disk", False))
         if cached_response is not None:
             return cached_response
+        
+        # Mark request as in-flight (for deduplication)
+        with _in_flight_lock:
+            _in_flight_requests[cache_key] = True
     
     if stream:
         # Streaming response with retry
@@ -1920,7 +2033,11 @@ def call_grok_api(
             # Cache response
             if config.get("cache_enabled", True):
                 cache_key = _semantic_hash(messages, model, temperature)
-                _update_cache(cache_key, result, config.get("cache_size", 100))
+                _update_cache(cache_key, result, config.get("cache_size", 100), config.get("cache_disk", False))
+                
+                # Remove from in-flight requests (deduplication)
+                with _in_flight_lock:
+                    _in_flight_requests.pop(cache_key, None)
             
             return result
         except httpx.HTTPStatusError as e:
@@ -2131,6 +2248,11 @@ def main():
     parser.add_argument('--list-agents', action='store_true', help='List all available specialized agents')
     parser.add_argument('--export-data', action='store_true', help='Export all user data (GDPR/CCPA compliance)')
     parser.add_argument('--delete-data', action='store_true', help='Delete all user data (GDPR/CCPA compliance)')
+    parser.add_argument('--chain', nargs='+', help='Chain multiple agents (e.g., --chain security performance testing)')
+    parser.add_argument('--local-llm', action='store_true', help='Enable local LLM (Ollama)')
+    parser.add_argument('--local-llm-model', type=str, default='llama3.2', help='Local LLM model name')
+    parser.add_argument('--image', action='append', help='Add image file to message (can be used multiple times)')
+    parser.add_argument('--file', action='append', help='Add file to message (can be used multiple times)')
     parser.add_argument('query', nargs='*', help='Query for non-interactive mode')
     args = parser.parse_args()
 
@@ -2240,8 +2362,37 @@ def main():
         else:
             logger.info("Using orchestrator by default (Grok-Code behavior - orchestrator assigns agents based on context)")
     
+    # Enable local LLM if requested
+    if args.local_llm:
+        config['local_llm_enabled'] = True
+        config['local_llm_model'] = args.local_llm_model
+        logger.info(f"Local LLM enabled with model: {args.local_llm_model}")
+    
     history = load_history()
     todos = load_todos()
+
+    # Handle agent chaining (Phase 4.2)
+    if args.chain and AGENT_CHAINING_AVAILABLE:
+        query = ' '.join(args.query) if args.query else input("Enter query: ").strip()
+        if not query:
+            print(colored("Error: Query required for agent chaining", 'red'))
+            sys.exit(1)
+        
+        try:
+            result = chain_agents(args.chain, query, config)
+            print(colored(f"\nFinal Result:\n{result['final_result']}", 'green'))
+            if result.get('intermediate_results'):
+                print(colored("\nIntermediate Results:", 'cyan'))
+                for i, res in enumerate(result['intermediate_results'], 1):
+                    agent = res.get('agent', 'unknown')
+                    if 'error' in res:
+                        print(colored(f"  {i}. {agent}: ERROR - {res['error']}", 'red'))
+                    else:
+                        print(colored(f"  {i}. {agent}: {res.get('result', '')[:100]}...", 'yellow'))
+            sys.exit(0 if result.get('success') else 1)
+        except Exception as e:
+            print(colored(f"Agent chaining error: {e}", 'red'))
+            sys.exit(1)
 
     if args.interactive:
         # Start/decline prompt (exact Claude match)
@@ -2253,7 +2404,7 @@ def main():
         # Accept "1", "yes", "y" as affirmative
         if choice not in ['1', 'yes', 'y']:
             print("Declined.")
-        sys.exit(0)
+            sys.exit(0)
     
         # Quota check (emulate Claude's lightweight call)
         try:
@@ -2315,8 +2466,11 @@ def main():
                     print(colored("Session ended.", 'green'))
                     break
 
-                # Slash commands (Claude-like)
+                # Slash commands (Claude-like) - use helper if available
                 if user_input.startswith('/'):
+                    if MAIN_HELPERS_AVAILABLE and handle_slash_commands(user_input, api_key, config, history):
+                        continue
+                    # Fallback to inline implementation
                     if user_input == '/help':
                         print(colored("Commands:", 'cyan'))
                         print("  /init  - Generate ELEVEN.md with project instructions/tools")
@@ -2402,72 +2556,112 @@ def main():
                 # Extract and execute tools
                 tool_calls = extract_tools(full_response)
                 for tool_name, params_list in tool_calls:
-                    if tool_name not in TOOLS:
-                        print(colored(f"Unknown tool: {tool_name}", 'red'))
-                        continue
-
                     # Build params dict
                     params = {p[0]: p[1] for p in params_list}
                     
-                    # Classify risk for Bash commands
-                    risk = classify_command_risk(params.get('command', '')) if tool_name == 'Bash' else "SAFE"
+                    # Validate tool parameters (Phase 3.3)
+                    if VALIDATION_AVAILABLE and validate_tool_params:
+                        # Basic validation
+                        if tool_name == "Bash" and validate_command:
+                            valid, error = validate_command(params.get("command", ""))
+                            if not valid:
+                                print(colored(f"Invalid command: {error}", 'red'))
+                                continue
+                        elif tool_name in ["View", "Edit", "Write", "LS", "Glob", "Grep"] and validate_file_path:
+                            path = params.get("path", params.get("file", params.get("dir", ".")))
+                            valid, error = validate_file_path(path, must_exist=(tool_name in ["View", "Edit"]))
+                            if not valid:
+                                print(colored(f"Invalid path: {error}", 'red'))
+                                continue
+                    
+                    # Use helper function if available, otherwise inline execution
+                    if MAIN_HELPERS_AVAILABLE:
+                        exit_code, stdout, stderr = execute_tool_safely(tool_name, params, args, history)
+                        if exit_code is None:
+                            continue  # Tool execution was cancelled or failed validation
+                    else:
+                        # Check if tool exists in TOOLS or plugin system (Phase 3.2)
+                        if tool_name not in TOOLS:
+                            # Try plugin system
+                            if PLUGIN_SYSTEM_AVAILABLE and plugin_get_tool:
+                                plugin_tool = plugin_get_tool(tool_name)
+                                if plugin_tool:
+                                    try:
+                                        exit_code, stdout, stderr = plugin_execute_tool(tool_name, params)
+                                        result_text = stdout if stdout else stderr
+                                        if exit_code == 0:
+                                            print(colored(f"Plugin tool {tool_name} result: {result_text}", 'magenta'))
+                                        else:
+                                            print(colored(f"Plugin tool {tool_name} error: {result_text}", 'red'))
+                                    except Exception as e:
+                                        print(colored(f"Plugin tool {tool_name} exception: {e}", 'red'))
+                                    continue
+                            else:
+                                print(colored(f"Unknown tool: {tool_name}", 'red'))
+                                continue
+                        
+                        # Classify risk for Bash commands
+                        risk = classify_command_risk(params.get('command', '')) if tool_name == 'Bash' else "SAFE"
 
-                    # Pre-hook
-                    pre_ok, pre_out = run_hook("PreToolUse", {"tool": tool_name, "params": params})
-                    if not pre_ok:
-                        print(colored(f"Pre-hook failed: {pre_out}", 'red'))
-                        continue
-
-                    # Permission prompt (unless skipped)
-                    if not args.dangerously_skip_permissions and risk != "SAFE" and not args.force:
-                        print(colored(f"Allow {tool_name} with params {params}? [y/n]", 'yellow'))
-                        if input().lower() != 'y':
+                        # Pre-hook
+                        pre_ok, pre_out = run_hook("PreToolUse", {"tool": tool_name, "params": params})
+                        if not pre_ok:
+                            print(colored(f"Pre-hook failed: {pre_out}", 'red'))
                             continue
 
-                    # Execute tool
-                    exit_code = 1
-                    stdout = ""
-                    stderr = ""
-                    result_text = ""
-                    
-                    try:
-                        if tool_name == 'Bash':
-                            exit_code, stdout, stderr = TOOLS[tool_name](params, allow_force=args.force)
-                        else:
-                            exit_code, stdout, stderr = TOOLS[tool_name](params)
+                        # Permission prompt (unless skipped)
+                        if not args.dangerously_skip_permissions and risk != "SAFE" and not args.force:
+                            print(colored(f"Allow {tool_name} with params {params}? [y/n]", 'yellow'))
+                            if input().lower() != 'y':
+                                continue
+
+                        # Execute tool
+                        exit_code = 1
+                        stdout = ""
+                        stderr = ""
+                        result_text = ""
                         
-                        result_text = stdout if stdout else stderr
-                        if exit_code == 0:
-                            print(colored(f"Tool {tool_name} result: {result_text}", 'magenta'))
-                        else:
-                            print(colored(f"Tool {tool_name} error: {result_text}", 'red'))
-                    except Exception as e:
-                        print(colored(f"Tool {tool_name} exception: {e}", 'red'))
-                        result_text = str(e)
-                        stderr = str(e)
-                        continue
+                        try:
+                            if tool_name == 'Bash':
+                                exit_code, stdout, stderr = TOOLS[tool_name](params, allow_force=args.force)
+                            else:
+                                exit_code, stdout, stderr = TOOLS[tool_name](params)
+                            
+                            result_text = stdout if stdout else stderr
+                            if exit_code == 0:
+                                print(colored(f"Tool {tool_name} result: {result_text}", 'magenta'))
+                            else:
+                                print(colored(f"Tool {tool_name} error: {result_text}", 'red'))
+                        except Exception as e:
+                            print(colored(f"Tool {tool_name} exception: {e}", 'red'))
+                            result_text = str(e)
+                            stderr = str(e)
+                            continue
 
-                    # Post-hook (only if tool executed successfully)
-                    if exit_code is not None:
-                        run_hook("PostToolUse", {"tool": tool_name, "result": result_text if exit_code == 0 else stderr})
+                        # Post-hook (only if tool executed successfully)
+                        if exit_code is not None:
+                            run_hook("PostToolUse", {"tool": tool_name, "result": result_text if exit_code == 0 else stderr})
 
-                # Compact history if too long
-                if len(history) > HISTORY_COMPACT_THRESHOLD:
-                    try:
-                        compact_resp = call_grok_api(
-                            api_key,
-                            [{"role": "user", "content": COMPACT_PROMPT.format(history=json.dumps(history[1:]))}],
-                            config['model'],
-                            config['temperature'],
-                            1024,
-                            stream=False,
-                            config=config
-                        )
-                        compacted_content = compact_resp.get('choices', [{}])[0].get('message', {}).get('content', '')
-                        history = [history[0]] + [{"role": "assistant", "content": compacted_content}]
-                    except Exception:
-                        # If compaction fails, just keep recent history
-                        history = history[:1] + history[-19:]
+                # Compact history if too long (use helper if available)
+                if MAIN_HELPERS_AVAILABLE:
+                    history = compact_history_if_needed(history, api_key, config)
+                else:
+                    if len(history) > HISTORY_COMPACT_THRESHOLD:
+                        try:
+                            compact_resp = call_grok_api(
+                                api_key,
+                                [{"role": "user", "content": COMPACT_PROMPT.format(history=json.dumps(history[1:]))}],
+                                config['model'],
+                                config['temperature'],
+                                1024,
+                                stream=False,
+                                config=config
+                            )
+                            compacted_content = compact_resp.get('choices', [{}])[0].get('message', {}).get('content', '')
+                            history = [history[0]] + [{"role": "assistant", "content": compacted_content}]
+                        except Exception:
+                            # If compaction fails, just keep recent history
+                            history = history[:1] + history[-19:]
 
                 # Todos if mentioned
                 if "todo" in user_input.lower():
@@ -2500,10 +2694,19 @@ def main():
         cwd, git_status, dir_tree = get_env_context()
         system_prompt = get_system_prompt(cwd, git_status, dir_tree)
         
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": query}
-        ]
+        # Support multi-modal input (Phase 4.3)
+        if MULTIMODAL_AVAILABLE and (args.image or args.file):
+            messages = create_multimodal_messages(
+                query,
+                image_paths=args.image or [],
+                file_paths=args.file or [],
+                system_prompt=system_prompt
+            )
+        else:
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": query}
+            ]
         
         # Add recent history if available
         if history:
