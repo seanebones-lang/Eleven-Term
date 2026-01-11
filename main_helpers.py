@@ -354,6 +354,17 @@ def run_interactive_loop(
             
             # Extract and execute tools
             tool_calls = extract_tools(full_response)
+            
+            # Fallback: if no XML tools found, try natural language parsing (for orchestrator API)
+            if not tool_calls:
+                try:
+                    from loop_utils import extract_tools_from_natural_language
+                    tool_calls = extract_tools_from_natural_language(full_response)
+                    if tool_calls:
+                        print(colored(f"\n🔧 Detected {len(tool_calls)} tool(s) from response, executing...", 'cyan'))
+                except ImportError:
+                    pass  # loop_utils not available
+            
             for tool_name, params_list in tool_calls:
                 params = {p[0]: p[1] for p in params_list}
                 execute_tool_safely(tool_name, params, args, history)
