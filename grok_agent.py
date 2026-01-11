@@ -122,28 +122,190 @@ DEFAULT_CONFIG = {
         # Main endpoint supports all agents via /api/chat with mode parameter
         "grokcode_endpoint": "https://grokcode.vercel.app/api/chat",
     },
-    # 20 Specialized Agents from Grok-Code
+    # Specialized Agents from Grok-Code repository (https://github.com/seanebones-lang/Grok-Code)
     "specialized_agents": {
-        "security": {"name": "Security Agent", "emoji": "🔒", "mode": "agent", "agent": "security"},
-        "performance": {"name": "Performance Agent", "emoji": "⚡", "mode": "agent", "agent": "performance"},
-        "testing": {"name": "Testing Agent", "emoji": "🧪", "mode": "agent", "agent": "testing"},
-        "documentation": {"name": "Documentation Agent", "emoji": "📚", "mode": "agent", "agent": "documentation"},
-        "migration": {"name": "Migration Agent", "emoji": "🔄", "mode": "agent", "agent": "migration"},
-        "dependency": {"name": "Dependency Agent", "emoji": "📦", "mode": "agent", "agent": "dependency"},
-        "codeReview": {"name": "Code Review Agent", "emoji": "🔍", "mode": "review", "agent": "codeReview"},
-        "bugHunter": {"name": "Bug Hunter Agent", "emoji": "🐛", "mode": "debug", "agent": "bugHunter"},
-        "optimization": {"name": "Optimization Agent", "emoji": "🎯", "mode": "agent", "agent": "optimization"},
-        "accessibility": {"name": "Accessibility Agent", "emoji": "♿", "mode": "agent", "agent": "accessibility"},
-        "orchestrator": {"name": "Orchestrator Agent", "emoji": "🎼", "mode": "orchestrate", "agent": "orchestrator"},
-        "swarm": {"name": "Agent Swarm", "emoji": "🐝", "mode": "agent", "agent": "swarm"},
-        "mobile": {"name": "Mobile App Agent", "emoji": "📱", "mode": "agent", "agent": "mobile"},
-        "devops": {"name": "DevOps Agent", "emoji": "🚀", "mode": "agent", "agent": "devops"},
-        "database": {"name": "Database Agent", "emoji": "🗄️", "mode": "agent", "agent": "database"},
-        "api": {"name": "API Design Agent", "emoji": "🔌", "mode": "agent", "agent": "api"},
-        "uiux": {"name": "UI/UX Agent", "emoji": "🎨", "mode": "agent", "agent": "uiux"},
-        "aiml": {"name": "AI/ML Agent", "emoji": "🤖", "mode": "agent", "agent": "aiml"},
-        "data": {"name": "Data Engineering Agent", "emoji": "📊", "mode": "agent", "agent": "data"},
-        "fullstack": {"name": "Full Stack Agent", "emoji": "🏗️", "mode": "agent", "agent": "fullstack"},
+        "security": {
+            "name": "Security Agent",
+            "emoji": "🔒",
+            "mode": "agent",
+            "agent": "security",
+            "description": "Scans for vulnerabilities, security issues, and compliance violations"
+        },
+        "performance": {
+            "name": "Performance Agent",
+            "emoji": "⚡",
+            "mode": "agent",
+            "agent": "performance",
+            "description": "Analyzes and optimizes code performance, bottlenecks, and resource usage"
+        },
+        "testing": {
+            "name": "Testing Agent",
+            "emoji": "🧪",
+            "mode": "agent",
+            "agent": "testing",
+            "description": "Generates comprehensive test suites, coverage reports, and test strategies"
+        },
+        "documentation": {
+            "name": "Documentation Agent",
+            "emoji": "📚",
+            "mode": "agent",
+            "agent": "documentation",
+            "description": "Generates comprehensive documentation, README files, and API docs"
+        },
+        "migration": {
+            "name": "Migration Agent",
+            "emoji": "🔄",
+            "mode": "agent",
+            "agent": "migration",
+            "description": "Handles framework/library migrations and version upgrades"
+        },
+        "dependency": {
+            "name": "Dependency Agent",
+            "emoji": "📦",
+            "mode": "agent",
+            "agent": "dependency",
+            "description": "Manages dependencies, updates, and resolves conflicts"
+        },
+        "codeReview": {
+            "name": "Code Review Agent",
+            "emoji": "🔍",
+            "mode": "agent",
+            "agent": "codeReview",
+            "description": "Performs deep code reviews with best practices and quality checks"
+        },
+        "bugHunter": {
+            "name": "Bug Hunter Agent",
+            "emoji": "🐛",
+            "mode": "agent",
+            "agent": "bugHunter",
+            "description": "Specialized bug detection and debugging with root cause analysis"
+        },
+        "debugging": {
+            "name": "Debugging Agent",
+            "emoji": "🐛",
+            "mode": "agent",
+            "agent": "debugging",
+            "description": "Expert in debugging techniques, error analysis, log analysis, and troubleshooting complex issues"
+        },
+        "code-review": {
+            "name": "Code Review Agent",
+            "emoji": "👀",
+            "mode": "agent",
+            "agent": "code-review",
+            "description": "Expert in code review, identifying bugs, suggesting improvements, and ensuring code quality standards"
+        },
+        "optimization": {
+            "name": "Optimization Agent",
+            "emoji": "🎯",
+            "mode": "agent",
+            "agent": "optimization",
+            "description": "Code optimization, refactoring, and efficiency improvements"
+        },
+        "accessibility": {
+            "name": "Accessibility Agent",
+            "emoji": "♿",
+            "mode": "agent",
+            "agent": "accessibility",
+            "description": "Ensures code meets WCAG standards and accessibility best practices"
+        },
+        "uiux": {
+            "name": "UI/UX Agent",
+            "emoji": "🎨",
+            "mode": "agent",
+            "agent": "uiux",
+            "description": "Design systems, components, styling, and user experience"
+        },
+        "backend": {
+            "name": "Backend Agent",
+            "emoji": "⚙️",
+            "mode": "agent",
+            "agent": "backend",
+            "description": "Expert in backend development, server architecture, APIs, microservices, and server-side technologies"
+        },
+        "frontend": {
+            "name": "Frontend Agent",
+            "emoji": "💻",
+            "mode": "agent",
+            "agent": "frontend",
+            "description": "Expert in frontend development, modern frameworks, responsive design, and client-side technologies"
+        },
+        "devops": {
+            "name": "DevOps Agent",
+            "emoji": "🚀",
+            "mode": "agent",
+            "agent": "devops",
+            "description": "CI/CD pipelines, Docker, Kubernetes, infrastructure as code"
+        },
+        "database": {
+            "name": "Database Agent",
+            "emoji": "🗄️",
+            "mode": "agent",
+            "agent": "database",
+            "description": "Database design, queries, migrations, and optimization"
+        },
+        "api": {
+            "name": "API Design Agent",
+            "emoji": "🔌",
+            "mode": "agent",
+            "agent": "api",
+            "description": "REST API, GraphQL, WebSocket, and API design patterns"
+        },
+        "cloud": {
+            "name": "Cloud Agent",
+            "emoji": "☁️",
+            "mode": "agent",
+            "agent": "cloud",
+            "description": "Expert in cloud platforms (AWS, GCP, Azure), cloud architecture, serverless, and cloud-native development"
+        },
+        "mobile": {
+            "name": "Mobile App Agent",
+            "emoji": "📱",
+            "mode": "agent",
+            "agent": "mobile",
+            "description": "Expert in React Native, Flutter, iOS & Android mobile development"
+        },
+        "aiml": {
+            "name": "AI/ML Agent",
+            "emoji": "🤖",
+            "mode": "agent",
+            "agent": "aiml",
+            "description": "Machine learning integration, LLMs, embeddings, and AI pipelines"
+        },
+        "blockchain": {
+            "name": "Blockchain Agent",
+            "emoji": "⛓️",
+            "mode": "agent",
+            "agent": "blockchain",
+            "description": "Expert in blockchain technology, smart contracts, cryptocurrency, and decentralized applications"
+        },
+        "orchestrator": {
+            "name": "Orchestrator Agent",
+            "emoji": "🎼",
+            "mode": "orchestrate",
+            "agent": "orchestrator",
+            "description": "Coordinates and delegates tasks to multiple specialized agents"
+        },
+        "swarm": {
+            "name": "Agent Swarm",
+            "emoji": "🐝",
+            "mode": "agent",
+            "agent": "swarm",
+            "description": "Runs multiple agents in parallel for comprehensive analysis"
+        },
+        "data": {
+            "name": "Data Engineering Agent",
+            "emoji": "📊",
+            "mode": "agent",
+            "agent": "data",
+            "description": "Data pipelines, ETL, analytics, and data transformation"
+        },
+        "fullstack": {
+            "name": "Full Stack Agent",
+            "emoji": "🏗️",
+            "mode": "agent",
+            "agent": "fullstack",
+            "description": "End-to-end feature development across frontend and backend"
+        },
         "xcode": {
             "name": "Xcode Expert Agent",
             "emoji": "📱",
@@ -157,6 +319,13 @@ DEFAULT_CONFIG = {
             "mode": "agent",
             "agent": "android",
             "description": "25-year expert in Android Studio, Kotlin, Java, Android, Google Play Store rules, troubleshooting, latest tech (Jan 2026), best build practices, Android UI/UX"
+        },
+        "refactoring": {
+            "name": "Refactoring Agent",
+            "emoji": "♻️",
+            "mode": "agent",
+            "agent": "refactoring",
+            "description": "Expert in code refactoring, improving code quality, reducing technical debt, and maintaining clean code architecture"
         },
     }
 }
@@ -214,7 +383,10 @@ def get_system_prompt(cwd: str, git_status: str, dir_tree: str) -> str:
         "AndroidBuild (build Android project), AndroidOpen (open in Android Studio), "
         "AndroidStudioInfo (Android Studio/SDK info), AndroidListEmulators (list emulators), "
         "AndroidStartEmulator (start emulator), AndroidListDevices (list connected devices), "
-        "AndroidSDKManager (SDK Manager info)"
+        "AndroidSDKManager (SDK Manager info), "
+        "MySQLQuery (execute MySQL query), PostgreSQLQuery (execute PostgreSQL query), "
+        "MongoDBQuery (execute MongoDB query), RedisCommand (execute Redis command), "
+        "HTTPieRequest (HTTP request via HTTPie), CurlRequest (HTTP request via curl)"
     )
     
     return f"""You are eleven Terminal Agent, a helpful coding assistant in the terminal. 
@@ -637,6 +809,412 @@ def tool_android_sdk_manager(params: Dict[str, Any]) -> Tuple[int, str, str]:
     except Exception as e:
         return 1, "", str(e)
 
+# Database Tools
+def tool_mysql_query(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Execute MySQL query"""
+    try:
+        from database_utils import execute_mysql_query
+        host = params.get('host', 'localhost')
+        user = params.get('user', 'root')
+        database = params.get('database', '')
+        query = params.get('query', '')
+        password = params.get('password', None)
+        
+        if not database or not query:
+            return 1, "", "database and query parameters required"
+        
+        return execute_mysql_query(host, user, database, query, password)
+    except ImportError:
+        return 1, "", "database_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_postgresql_query(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Execute PostgreSQL query"""
+    try:
+        from database_utils import execute_postgresql_query
+        host = params.get('host', 'localhost')
+        user = params.get('user', 'postgres')
+        database = params.get('database', '')
+        query = params.get('query', '')
+        password = params.get('password', None)
+        
+        if not database or not query:
+            return 1, "", "database and query parameters required"
+        
+        return execute_postgresql_query(host, user, database, query, password)
+    except ImportError:
+        return 1, "", "database_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_mongodb_query(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Execute MongoDB query"""
+    try:
+        from database_utils import execute_mongodb_query
+        uri = params.get('uri', 'mongodb://localhost:27017')
+        database = params.get('database', '')
+        collection = params.get('collection', '')
+        query = params.get('query', '')
+        
+        if not database or not collection or not query:
+            return 1, "", "database, collection, and query parameters required"
+        
+        return execute_mongodb_query(uri, database, collection, query)
+    except ImportError:
+        return 1, "", "database_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_redis_command(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Execute Redis command"""
+    try:
+        from database_utils import execute_redis_command
+        host = params.get('host', 'localhost')
+        port = params.get('port', 6379)
+        command = params.get('command', '')
+        password = params.get('password', None)
+        
+        if not command:
+            return 1, "", "command parameter required"
+        
+        return execute_redis_command(host, port, command, password)
+    except ImportError:
+        return 1, "", "database_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+# API Tools
+def tool_httpie_request(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Execute HTTP request using HTTPie"""
+    try:
+        from api_utils import httpie_request
+        method = params.get('method', 'GET')
+        url = params.get('url', '')
+        headers = params.get('headers', None)
+        data = params.get('data', None)
+        json_data = params.get('json', None)
+        
+        if not url:
+            return 1, "", "url parameter required"
+        
+        return httpie_request(method, url, headers, data, json_data)
+    except ImportError:
+        return 1, "", "api_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_curl_request(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Execute HTTP request using curl (enhanced)"""
+    try:
+        from api_utils import curl_request
+        method = params.get('method', 'GET')
+        url = params.get('url', '')
+        headers = params.get('headers', None)
+        data = params.get('data', None)
+        json_data = params.get('json', None)
+        
+        if not url:
+            return 1, "", "url parameter required"
+        
+        return curl_request(method, url, headers, data, json_data)
+    except ImportError:
+        return 1, "", "api_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+# Security Scanning Tools
+def tool_snyk_test(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Run Snyk security test"""
+    try:
+        from security_scanning_utils import snyk_test
+        path = params.get('path', '.')
+        severity = params.get('severity', 'low')
+        return snyk_test(path, severity)
+    except ImportError:
+        return 1, "", "security_scanning_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_trivy_scan(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Scan with Trivy (container or filesystem)"""
+    try:
+        from security_scanning_utils import trivy_scan_image, trivy_scan_filesystem
+        scan_type = params.get('type', 'filesystem')  # 'image' or 'filesystem'
+        target = params.get('target', '.')
+        severity = params.get('severity', 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL')
+        
+        if scan_type == 'image':
+            return trivy_scan_image(target, severity)
+        else:
+            return trivy_scan_filesystem(target, severity)
+    except ImportError:
+        return 1, "", "security_scanning_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_semgrep_scan(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Run Semgrep security scan"""
+    try:
+        from security_scanning_utils import semgrep_scan
+        path = params.get('path', '.')
+        config = params.get('config', 'auto')
+        return semgrep_scan(path, config)
+    except ImportError:
+        return 1, "", "security_scanning_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+# Performance Profiling Tools
+def tool_py_spy_top(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Show top Python functions using py-spy"""
+    try:
+        from profiling_utils import py_spy_top
+        pid = params.get('pid', None)
+        duration = params.get('duration', 10)
+        
+        if not pid:
+            return 1, "", "pid parameter required"
+        
+        return py_spy_top(pid, duration)
+    except ImportError:
+        return 1, "", "profiling_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_cprofile_analyze(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Analyze cProfile stats file"""
+    try:
+        from profiling_utils import analyze_profile_stats
+        stats_file = params.get('stats_file', '')
+        top_n = params.get('top_n', 20)
+        
+        if not stats_file:
+            return 1, "", "stats_file parameter required"
+        
+        return analyze_profile_stats(stats_file, top_n)
+    except ImportError:
+        return 1, "", "profiling_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+# Load Testing Tools
+def tool_k6_run(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Run k6 load test"""
+    try:
+        from load_testing_utils import k6_run, k6_simple_url
+        script_path = params.get('script', None)
+        url = params.get('url', None)
+        duration = params.get('duration', '30s')
+        vus = params.get('vus', 10)
+        
+        if script_path:
+            return k6_run(script_path, duration, vus)
+        elif url:
+            return k6_simple_url(url, duration, vus)
+        else:
+            return 1, "", "script or url parameter required"
+    except ImportError:
+        return 1, "", "load_testing_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_wrk_benchmark(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Run wrk HTTP benchmark"""
+    try:
+        from load_testing_utils import wrk_benchmark
+        url = params.get('url', '')
+        threads = params.get('threads', 4)
+        connections = params.get('connections', 10)
+        duration = params.get('duration', '30s')
+        
+        if not url:
+            return 1, "", "url parameter required"
+        
+        return wrk_benchmark(url, threads, connections, duration)
+    except ImportError:
+        return 1, "", "load_testing_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_ab_benchmark(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Run Apache Bench (ab) benchmark"""
+    try:
+        from load_testing_utils import ab_benchmark
+        url = params.get('url', '')
+        requests = params.get('requests', 1000)
+        concurrency = params.get('concurrency', 10)
+        
+        if not url:
+            return 1, "", "url parameter required"
+        
+        return ab_benchmark(url, requests, concurrency)
+    except ImportError:
+        return 1, "", "load_testing_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+# CI/CD Tools
+def tool_gh_workflow_list(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """List GitHub Actions workflows"""
+    try:
+        from cicd_utils import gh_workflow_list
+        repo = params.get('repo', None)
+        return gh_workflow_list(repo)
+    except ImportError:
+        return 1, "", "cicd_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_gh_run_list(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """List GitHub Actions workflow runs"""
+    try:
+        from cicd_utils import gh_run_list
+        repo = params.get('repo', None)
+        limit = params.get('limit', 10)
+        return gh_run_list(repo, limit)
+    except ImportError:
+        return 1, "", "cicd_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_gh_run_view(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """View GitHub Actions workflow run"""
+    try:
+        from cicd_utils import gh_run_view
+        run_id = params.get('run_id', '')
+        repo = params.get('repo', None)
+        
+        if not run_id:
+            return 1, "", "run_id parameter required"
+        
+        return gh_run_view(run_id, repo)
+    except ImportError:
+        return 1, "", "cicd_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+# Database Migration Tools
+def tool_alembic_current(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Show current Alembic migration revision"""
+    try:
+        from migration_utils import alembic_current
+        directory = params.get('directory', '.')
+        return alembic_current(directory)
+    except ImportError:
+        return 1, "", "migration_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_alembic_upgrade(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Upgrade database using Alembic"""
+    try:
+        from migration_utils import alembic_upgrade
+        revision = params.get('revision', 'head')
+        directory = params.get('directory', '.')
+        return alembic_upgrade(revision, directory)
+    except ImportError:
+        return 1, "", "migration_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_dbmate_up(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Run dbmate migrations up"""
+    try:
+        from migration_utils import dbmate_up
+        database_url = params.get('database_url', None)
+        return dbmate_up(database_url)
+    except ImportError:
+        return 1, "", "migration_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_dbmate_status(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Show dbmate migration status"""
+    try:
+        from migration_utils import dbmate_status
+        database_url = params.get('database_url', None)
+        return dbmate_status(database_url)
+    except ImportError:
+        return 1, "", "migration_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+# Container Orchestration Tools
+def tool_kubectl_get(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Get Kubernetes resources"""
+    try:
+        from orchestration_utils import kubectl_get
+        resource = params.get('resource', '')
+        namespace = params.get('namespace', None)
+        output_format = params.get('output', 'json')
+        
+        if not resource:
+            return 1, "", "resource parameter required"
+        
+        return kubectl_get(resource, namespace, output_format)
+    except ImportError:
+        return 1, "", "orchestration_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_helm_list(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """List Helm releases"""
+    try:
+        from orchestration_utils import helm_list
+        namespace = params.get('namespace', None)
+        return helm_list(namespace)
+    except ImportError:
+        return 1, "", "orchestration_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_docker_compose_up(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Start Docker Compose services"""
+    try:
+        from orchestration_utils import docker_compose_up
+        compose_file = params.get('compose_file', None)
+        services = params.get('services', None)
+        detach = params.get('detach', True)
+        return docker_compose_up(compose_file, services, detach)
+    except ImportError:
+        return 1, "", "orchestration_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+# Secrets Management Tools
+def tool_vault_read(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Read secret from Vault"""
+    try:
+        from secrets_utils import vault_read
+        path = params.get('path', '')
+        field = params.get('field', None)
+        
+        if not path:
+            return 1, "", "path parameter required"
+        
+        return vault_read(path, field)
+    except ImportError:
+        return 1, "", "secrets_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
+def tool_sops_decrypt(params: Dict[str, Any]) -> Tuple[int, str, str]:
+    """Decrypt file with SOPS"""
+    try:
+        from secrets_utils import sops_decrypt
+        file_path = params.get('file', '')
+        output_file = params.get('output', None)
+        
+        if not file_path:
+            return 1, "", "file parameter required"
+        
+        return sops_decrypt(file_path, output_file)
+    except ImportError:
+        return 1, "", "secrets_utils module not available"
+    except Exception as e:
+        return 1, "", str(e)
+
 # Tools registry
 TOOLS = {
     "Bash": tool_bash,
@@ -663,6 +1241,41 @@ TOOLS = {
     "AndroidStartEmulator": tool_android_start_emulator,
     "AndroidListDevices": tool_android_list_devices,
     "AndroidSDKManager": tool_android_sdk_manager,
+    # Database Tools
+    "MySQLQuery": tool_mysql_query,
+    "PostgreSQLQuery": tool_postgresql_query,
+    "MongoDBQuery": tool_mongodb_query,
+    "RedisCommand": tool_redis_command,
+    # API Tools
+    "HTTPieRequest": tool_httpie_request,
+    "CurlRequest": tool_curl_request,
+    # Security Scanning Tools
+    "SnykTest": tool_snyk_test,
+    "TrivyScan": tool_trivy_scan,
+    "SemgrepScan": tool_semgrep_scan,
+    # Performance Profiling Tools
+    "PySpyTop": tool_py_spy_top,
+    "CProfileAnalyze": tool_cprofile_analyze,
+    # Load Testing Tools
+    "K6Run": tool_k6_run,
+    "WrkBenchmark": tool_wrk_benchmark,
+    "ABBenchmark": tool_ab_benchmark,
+    # CI/CD Tools
+    "GHWorkflowList": tool_gh_workflow_list,
+    "GHRunList": tool_gh_run_list,
+    "GHRunView": tool_gh_run_view,
+    # Database Migration Tools
+    "AlembicCurrent": tool_alembic_current,
+    "AlembicUpgrade": tool_alembic_upgrade,
+    "DBMateUp": tool_dbmate_up,
+    "DBMateStatus": tool_dbmate_status,
+    # Container Orchestration Tools
+    "KubectlGet": tool_kubectl_get,
+    "HelmList": tool_helm_list,
+    "DockerComposeUp": tool_docker_compose_up,
+    # Secrets Management Tools
+    "VaultRead": tool_vault_read,
+    "SopsDecrypt": tool_sops_decrypt,
 }
 
 def get_api_key() -> Optional[str]:
@@ -1640,7 +2253,7 @@ def main():
         # Accept "1", "yes", "y" as affirmative
         if choice not in ['1', 'yes', 'y']:
             print("Declined.")
-            sys.exit(0)
+        sys.exit(0)
     
         # Quota check (emulate Claude's lightweight call)
         try:
